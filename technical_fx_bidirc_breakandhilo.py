@@ -48,6 +48,10 @@ class HILO:
         ma_low=self.MA(LOW,23)
         return ma_low
 
+    def get_LOW_MAX2(self, LOW):
+        min_low = self.min_value(LOW,23)
+
+
     def get_long_price(self, HIGH):
         ma_high=self.get_HIGH_MA(HIGH)
         return ma_high
@@ -279,7 +283,7 @@ if __name__ == '__main__':
     length = 1
     for i in range(0,length):
         #value,counter = hilo.simulate(num=24 * 7 * 4 + 50, periods="1H", end_offset=3600 * 24 * 7 * (i+0))
-        value, counter = hilo.simulate(num=24 * 7 * 12 + 50, periods="1H", end_offset=0)
+        value, counter = hilo.simulate(num=24 * 7 * 1 + 50, periods="1H", end_offset=0)
         sum = sum + value
         counter_sum = counter_sum+counter
     # hilo.simulate(num=60*24*50+61, periods="1m", end_offset=0)

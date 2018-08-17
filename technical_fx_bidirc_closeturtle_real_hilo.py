@@ -20,6 +20,7 @@ class HILO:
     min_reward = 0
     pls_reward = 0
 
+
     def __init__(self):
         print("HILO initialized")
         self.btc_charts = historical_fx.charts()
@@ -30,6 +31,29 @@ class HILO:
         # print(x)
         return x.T
 
+    def max_value(self, ndarray, timeperiod):
+        x = np.asarray([talib.MAX(ndarray.T[0], timeperiod)])
+        return x.T
+
+    def min_value(self, ndarray, timeperiod):
+        x = np.asarray([talib.MIN(ndarray.T[0], timeperiod)])
+        return x.T
+        
+    def get_HIGH_MAX(self, HIGH):
+        max_high = self.max_value(HIGH,23)
+        return max_high
+
+    def get_LOW_MAX(self, LOW):
+        min_low = self.min_value(LOW,23)
+        return min_low
+
+    def get_HIGH_MAX2(self, HIGH):
+        max_high = self.max_value(HIGH,8)
+        return max_high
+
+    def get_LOW_MAX2(self, LOW):
+        min_low = self.min_value(LOW,8)
+        return min_low
 
     def get_HIGH_MA(self, HIGH):  # price=1*N (N>61)
         ma_high=self.MA(HIGH,23)
@@ -83,6 +107,8 @@ class HILO:
 
         self.trade_times +=1
 
+
+
     def simulate(self, num=100, periods="1m" ,end_offset=0):
         mode=0  #0: both long and short;
                 #1: only long;
@@ -97,8 +123,14 @@ class HILO:
 
 
         all = np.c_[time_stamp, open_price, high_price, low_price, close_price]
-        long_price = self.get_long_price(high_price)
-        short_price = self.get_short_price(low_price)
+        #long_price = self.get_long_price(high_price)
+        #short_price = self.get_short_price(low_price)
+
+        long_price = self.get_HIGH_MAX(high_price)
+        short_price = self.get_LOW_MAX(low_price)
+
+        longout_price = self.get_LOW_MAX2(low_price)
+        shortout_price = self.get_HIGH_MAX2(high_price)
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         print(len(long_price))
@@ -120,11 +152,14 @@ class HILO:
         trade_back=0
         slide = 0
         breakfactor =0
+
         for t in range(50, len(all)):
             # (gradient_real, grad_w_real)=self.get_current_GMMA_gradient_realtime(ema[t-1], all[t][2], periods)
             #current hour's operation price initialization
-            buy_price = long_price[t]
-            sell_price = short_price[t]
+            buy_price = long_price[t-1]
+            sell_price = short_price[t-1]
+            longout = longout_price[t-1]
+            shortout = shortout_price[t-1]
 
 
             if not short and not long:
@@ -150,7 +185,7 @@ class HILO:
 
             elif short and not long:
 
-                line = sell_price+(buy_price-sell_price)/2*(1+breakfactor)
+                line = shortout
                 if all[t][2] > line:
                     short = False
                     long = False
@@ -183,7 +218,7 @@ class HILO:
                     amount[t][5] = 88
 
             elif not short and long:
-                line = sell_price + (buy_price - sell_price) / 2
+                line = longout
                 if all[t][3] < line:
                     long = False
                     short = False
@@ -225,7 +260,7 @@ class HILO:
             amount[t][2] = cash
             amount[t][3] = btc
             amount[t][4] = value
-            print("value: %s" % value)
+
 
         all = np.c_[
             time_stamp, open_price, high_price, low_price, close_price, long_price,short_price, amount]
@@ -233,6 +268,7 @@ class HILO:
         data = pd.DataFrame(all,
                             columns={"1", "2", "3", "4", "5", "6", "7", "8", "9", "10","11","12","13", "14"})
 
+        print("value: %s" % value)
         print("============================")
         print(long_times)
         print(short_times)
@@ -284,14 +320,14 @@ if __name__ == '__main__':
     length = 1
     for i in range(0,length):
         #value,counter = hilo.simulate(num=24 * 7 * 4 + 50, periods="1H", end_offset=3600 * 24 * 7 * (i+0))
-        value, counter = hilo.simulate(num=24 * 7 * 60 + 50, periods="1H", end_offset=0)
+        value, counter = hilo.simulate(num=24 * 7 * (10) + 50, periods="1H", end_offset=0)
         sum = sum + value
         counter_sum = counter_sum+counter
-        print('all win: %d times, %f profit' % (hilo.win, hilo.pls_reward))
-        print('all lose: %d times, %f lost' % (hilo.lose, hilo.min_reward))
-        print('cost:%f' % abs(hilo.min_reward / hilo.lose))
-        print('R:%f' % (-(hilo.pls_reward) / (hilo.min_reward / hilo.lose)))
-        print('accuary:%f' % (hilo.win / hilo.trade_times))
+        print('all win: %d times, %f profit'%(hilo.win, hilo.pls_reward))
+        print('all lose: %d times, %f lost'%(hilo.lose, hilo.min_reward))
+        print('cost:%f'%abs(hilo.min_reward/hilo.lose))
+        print('R:%f'%(-(hilo.pls_reward)/(hilo.min_reward/hilo.lose)))
+        print('accuary:%f'%(hilo.win / hilo.trade_times))
     # hilo.simulate(num=60*24*50+61, periods="1m", end_offset=0)
     # a=hilo.publish_current_limit_price(periods="1H")
 

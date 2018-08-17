@@ -10,16 +10,10 @@ import pandas as pd
 # import plot_chart as plc
 import matplotlib.pyplot as plt
 # from matplotlib.finance import candlestick_ohlc as plot_candle
-import time
+import time,math
 
 
 class HILO:
-    win = 0
-    lose = 0
-    trade_times = 0
-    min_reward = 0
-    pls_reward = 0
-
     def __init__(self):
         print("HILO initialized")
         self.btc_charts = historical_fx.charts()
@@ -30,29 +24,38 @@ class HILO:
         # print(x)
         return x.T
 
-
-    def get_HIGH_MA(self, HIGH):  # price=1*N (N>61)
-        ma_high=self.MA(HIGH,23)
+    def get_HIGH_MA(self, HIGH, var_day = 23):  # price=1*N (N>61)
+        ma_high=self.MA(HIGH,var_day)
         return ma_high
 
-    def get_LOW_MA(self, LOW):  # price=1*N (N>61)
-        ma_low=self.MA(LOW,23)
+    def get_LOW_MA(self, LOW, var_day = 23):  # price=1*N (N>61)
+        ma_low=self.MA(LOW,var_day)
         return ma_low
 
-    def get_long_price(self, HIGH):
-        ma_high=self.get_HIGH_MA(HIGH)
+    def get_long_price(self, HIGH, var_day = 23):
+        ma_high=self.get_HIGH_MA(HIGH, var_day)
         return ma_high
 
-    def get_short_price(self, LOW):
-        ma_low = self.get_LOW_MA(LOW)
+    def get_short_price(self, LOW, var_day = 23):
+        ma_low = self.get_LOW_MA(LOW, var_day)
         return ma_low
+
+    def calcalate_er(self, open_price, high_price, low_price, close_price ,num=15, periods='1H'):
+
+        abs_all_hilo = np.sum(abs(high_price - low_price))
+        abs_act_hilo = abs(max(high_price) -min(low_price))
+
+        er = abs_act_hilo / abs_all_hilo
+        time_unit = math.floor((1-er) * 70 + 1)
+        return (er,time_unit)
 
     def publish_current_hilo_price(self, num=100, periods="1H"):
         (time_stamp, open_price, high_price, low_price, close_price) = self.btc_charts.get_price_array_till_finaltime(
             final_unixtime_stamp=time.time(), num=num, periods=periods, converter=True)
 
-        low_price_ma = self.get_short_price(low_price)
-        high_price_ma = self.get_long_price(high_price)
+        [er, time_unit] = self.calcalate_er()
+        low_price_ma = self.get_short_price(low_price, time_unit)
+        high_price_ma = self.get_long_price(high_price, time_unit)
         (buyprice, sellprice)=(high_price_ma[-1][0],low_price_ma[-1][0])
         a=(int(buyprice), int(sellprice))
         print(a)
@@ -60,28 +63,11 @@ class HILO:
 
     def trade_short(self, inprice, outprice, cash = 10000):
         # return profit
-        self.judge_win_or_lose_r(inprice, outprice, 'short')
         return((inprice-outprice)*cash/inprice)
 
     def trade_long(self, inprice, outprice, cash = 10000):
         # return profit
-        self.judge_win_or_lose_r(inprice, outprice, 'long')
         return((outprice-inprice)*cash/inprice)
-
-    def judge_win_or_lose_r(self, inprice, outprice, side):
-        if side == 'short':
-            reward = inprice - outprice
-        else:
-            reward = outprice - inprice
-
-        if reward > 0:
-            self.win += 1
-            self.pls_reward += reward
-        else:
-            self.lose += 1
-            self.min_reward += reward
-
-        self.trade_times +=1
 
     def simulate(self, num=100, periods="1m" ,end_offset=0):
         mode=0  #0: both long and short;
@@ -100,7 +86,12 @@ class HILO:
         long_price = self.get_long_price(high_price)
         short_price = self.get_short_price(low_price)
 
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        for t in range(50, len(all)):
+            [er, time_unit] = self.calcalate_er(open_price[t-5:t], high_price[t-5:t], low_price[t-5:t], close_price[t-5:t])
+            long_price[t] = self.get_long_price(high_price, time_unit)[t]
+            short_price[t] = self.get_short_price(low_price, time_unit)[t]
+
+            print(time_unit)
         print(len(long_price))
         print(len(short_price))
 
@@ -262,6 +253,8 @@ if __name__ == '__main__':
     # gmma.simulate(num=24 * 7 * 1 + 61, periods="1H", end_offset=3600 * 24 * 7 * 0)
 
     hilo = HILO()
+
+    #er = hilo.calcalate_er()
     # simulate the past 24 hours
     # hilo.simulate(num=24 * 7 * 1 + 20, periods="1H", end_offset=3600 * 24 * 7 * 0)
 
@@ -284,18 +277,13 @@ if __name__ == '__main__':
     length = 1
     for i in range(0,length):
         #value,counter = hilo.simulate(num=24 * 7 * 4 + 50, periods="1H", end_offset=3600 * 24 * 7 * (i+0))
-        value, counter = hilo.simulate(num=24 * 7 * 60 + 50, periods="1H", end_offset=0)
+        value, counter = hilo.simulate(num=24 * 7 * 12 + 50, periods="1H", end_offset=0)
         sum = sum + value
         counter_sum = counter_sum+counter
-        print('all win: %d times, %f profit' % (hilo.win, hilo.pls_reward))
-        print('all lose: %d times, %f lost' % (hilo.lose, hilo.min_reward))
-        print('cost:%f' % abs(hilo.min_reward / hilo.lose))
-        print('R:%f' % (-(hilo.pls_reward) / (hilo.min_reward / hilo.lose)))
-        print('accuary:%f' % (hilo.win / hilo.trade_times))
     # hilo.simulate(num=60*24*50+61, periods="1m", end_offset=0)
     # a=hilo.publish_current_limit_price(periods="1H")
 
     print('mouth ave: %f'%( sum / length))
     print(counter_sum / length)
 
-    hilo.publish_current_hilo_price()
+    #hilo.publish_current_hilo_price()
